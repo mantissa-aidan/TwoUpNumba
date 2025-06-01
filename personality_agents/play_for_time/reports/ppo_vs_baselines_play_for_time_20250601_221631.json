@@ -1,0 +1,23 @@
+{
+    "report_timestamp": "2025-06-01T22:16:31.945900",
+    "comparison_personality_context": "play_for_time",
+    "ppo_model_path": "personality_agents/play_for_time/models/ppo_two_up_play_for_time.zip",
+    "num_episodes_per_strategy": 1000,
+    "strategy_results": {
+        "ppo_trained": {
+            "average_final_balance": 100.31999969482422,
+            "average_win_rate": 0.4988258183002472,
+            "average_episode_reward": 5.5461883544921875
+        },
+        "random_baseline": {
+            "average_final_balance": 100.88999938964844,
+            "average_win_rate": 0.5012623071670532,
+            "average_episode_reward": 9.627425193786621
+        },
+        "always_no_bet": {
+            "average_final_balance": 100.0,
+            "average_win_rate": 0.0,
+            "average_episode_reward": 10.000019073486328
+        }
+    }
+}

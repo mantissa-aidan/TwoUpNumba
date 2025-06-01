@@ -1,0 +1,11 @@
+{
+    "report_timestamp": "2025-06-01T21:47:06.984476",
+    "personality_context": "standard",
+    "num_episodes_per_strategy": 1000,
+    "strategies": [
+        {
+            "strategy_name": "Pattern Betting",
+            "personality_context": "standard",
+            "num_episodes": 1000,
+            "base_bet": 10,
+            "avg_final_balance": 

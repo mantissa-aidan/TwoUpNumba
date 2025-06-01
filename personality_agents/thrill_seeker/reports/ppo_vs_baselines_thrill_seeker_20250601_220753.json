@@ -1,0 +1,23 @@
+{
+    "report_timestamp": "2025-06-01T22:07:53.746163",
+    "comparison_personality_context": "thrill_seeker",
+    "ppo_model_path": "personality_agents/thrill_seeker/models/ppo_two_up_thrill_seeker.zip",
+    "num_episodes_per_strategy": 1000,
+    "strategy_results": {
+        "ppo_trained": {
+            "average_final_balance": 99.66999816894531,
+            "average_win_rate": 0.4987020790576935,
+            "average_episode_reward": 37.72698974609375
+        },
+        "random_baseline": {
+            "average_final_balance": 100.13500213623047,
+            "average_win_rate": 0.4996265172958374,
+            "average_episode_reward": 19.24172019958496
+        },
+        "always_no_bet": {
+            "average_final_balance": 100.0,
+            "average_win_rate": 0.0,
+            "average_episode_reward": -20.000038146972656
+        }
+    }
+}

@@ -56,6 +56,7 @@ build/
 runs/
 logs/
 tensorboard/
+tensorboard_logs/
 
 # Streamlit
 .streamlit/
@@ -67,6 +68,7 @@ strategy_comparison.png
 *.ckpt
 *.h5
 *.pkl
+trained_models/
 
 # Environment variables
 .env

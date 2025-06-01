@@ -1,0 +1,23 @@
+{
+    "report_timestamp": "2025-06-01T22:12:11.174997",
+    "comparison_personality_context": "loss_averse",
+    "ppo_model_path": "personality_agents/loss_averse/models/ppo_two_up_loss_averse.zip",
+    "num_episodes_per_strategy": 1000,
+    "strategy_results": {
+        "ppo_trained": {
+            "average_final_balance": 100.0,
+            "average_win_rate": 0.0,
+            "average_episode_reward": 0.0
+        },
+        "random_baseline": {
+            "average_final_balance": 100.19999694824219,
+            "average_win_rate": 0.4998337924480438,
+            "average_episode_reward": -84.59500122070312
+        },
+        "always_no_bet": {
+            "average_final_balance": 100.0,
+            "average_win_rate": 0.0,
+            "average_episode_reward": 0.0
+        }
+    }
+}

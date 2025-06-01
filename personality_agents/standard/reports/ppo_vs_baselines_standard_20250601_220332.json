@@ -1,0 +1,23 @@
+{
+    "report_timestamp": "2025-06-01T22:03:32.918160",
+    "comparison_personality_context": "standard",
+    "ppo_model_path": "personality_agents/standard/models/ppo_two_up_standard.zip",
+    "num_episodes_per_strategy": 1000,
+    "strategy_results": {
+        "ppo_trained": {
+            "average_final_balance": 100.2300033569336,
+            "average_win_rate": 0.4958939254283905,
+            "average_episode_reward": -1.9550000429153442
+        },
+        "random_baseline": {
+            "average_final_balance": 97.80999755859375,
+            "average_win_rate": 0.49622541666030884,
+            "average_episode_reward": -3.5199999809265137
+        },
+        "always_no_bet": {
+            "average_final_balance": 100.0,
+            "average_win_rate": 0.0,
+            "average_episode_reward": 0.0
+        }
+    }
+}

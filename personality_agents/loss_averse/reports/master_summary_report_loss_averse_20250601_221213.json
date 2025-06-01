@@ -1,0 +1,129 @@
+{
+    "report_timestamp": "2025-06-01T22:12:13.381264",
+    "combined_report_for_personality": "loss_averse",
+    "source_reports": {
+        "ppo_vs_baselines": "F:\\Git Repos\\two-up\\personality_agents\\loss_averse\\reports\\ppo_vs_baselines_loss_averse_20250601_221211.json",
+        "universal_rule_based_strategies": "F:\\Git Repos\\two-up\\reports\\rule_based_strategies_summary_universal_20250601_215914.json"
+    },
+    "strategy_summaries": {
+        "PPO Trained": {
+            "average_final_balance": 100.0,
+            "average_win_rate": 0.0,
+            "average_episode_reward": 0.0
+        },
+        "Random Baseline": {
+            "average_final_balance": 100.19999694824219,
+            "average_win_rate": 0.4998337924480438,
+            "average_episode_reward": -84.59500122070312
+        },
+        "Always No Bet": {
+            "average_final_balance": 100.0,
+            "average_win_rate": 0.0,
+            "average_episode_reward": 0.0
+        },
+        "Pattern Betting": {
+            "strategy_name": "Pattern Betting",
+            "personality_context": "standard",
+            "num_episodes": 1000,
+            "base_bet": 10,
+            "avg_final_balance": 99.31999969482422,
+            "avg_win_rate": 0.49534788727760315,
+            "avg_episode_reward": -5.630000114440918,
+            "avg_total_games": 25.198,
+            "avg_rounds_played": 196.947,
+            "end_reason_distribution": {
+                "max_steps": 945,
+                "broke": 55
+            }
+        },
+        "Streak Betting": {
+            "strategy_name": "Streak Betting",
+            "personality_context": "standard",
+            "num_episodes": 1000,
+            "base_bet": 10,
+            "avg_final_balance": 103.3499984741211,
+            "avg_win_rate": 0.48273777961730957,
+            "avg_episode_reward": -22.84000015258789,
+            "avg_total_games": 86.497,
+            "avg_rounds_played": 173.111,
+            "end_reason_distribution": {
+                "max_steps": 709,
+                "broke": 291
+            }
+        },
+        "Always Heads": {
+            "strategy_name": "Always Heads",
+            "personality_context": "standard",
+            "num_episodes": 1000,
+            "base_bet": 10,
+            "avg_final_balance": 96.88999938964844,
+            "avg_win_rate": 0.4760255217552185,
+            "avg_episode_reward": -32.0,
+            "avg_total_games": 84.923,
+            "avg_rounds_played": 169.941,
+            "end_reason_distribution": {
+                "max_steps": 679,
+                "broke": 321
+            }
+        },
+        "Always Tails": {
+            "strategy_name": "Always Tails",
+            "personality_context": "standard",
+            "num_episodes": 1000,
+            "base_bet": 10,
+            "avg_final_balance": 102.48999786376953,
+            "avg_win_rate": 0.47946417331695557,
+            "avg_episode_reward": -24.600000381469727,
+            "avg_total_games": 85.757,
+            "avg_rounds_played": 171.339,
+            "end_reason_distribution": {
+                "max_steps": 699,
+                "broke": 301
+            }
+        },
+        "Vibes Based (Random)": {
+            "strategy_name": "Vibes Based (Random)",
+            "personality_context": "standard",
+            "num_episodes": 1000,
+            "base_bet": 10,
+            "avg_final_balance": 100.0,
+            "avg_win_rate": 0.48377954959869385,
+            "avg_episode_reward": -19.170000076293945,
+            "avg_total_games": 60.67,
+            "avg_rounds_played": 182.269,
+            "end_reason_distribution": {
+                "max_steps": 787,
+                "broke": 213
+            }
+        },
+        "Dickhead (No Bet/Conservative)": {
+            "strategy_name": "Dickhead (No Bet/Conservative)",
+            "personality_context": "standard",
+            "num_episodes": 1000,
+            "base_bet": 10,
+            "avg_final_balance": 100.0,
+            "avg_win_rate": 0.0,
+            "avg_episode_reward": 0.0,
+            "avg_total_games": 0.0,
+            "avg_rounds_played": 200.0,
+            "end_reason_distribution": {
+                "max_steps": 1000
+            }
+        },
+        "Legend (All In Heads)": {
+            "strategy_name": "Legend (All In Heads)",
+            "personality_context": "standard",
+            "num_episodes": 1000,
+            "base_bet": 10,
+            "avg_final_balance": 95.83999633789062,
+            "avg_win_rate": 0.4765891134738922,
+            "avg_episode_reward": -33.40999984741211,
+            "avg_total_games": 85.53,
+            "avg_rounds_played": 170.949,
+            "end_reason_distribution": {
+                "max_steps": 675,
+                "broke": 325
+            }
+        }
+    }
+}
