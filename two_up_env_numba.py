@@ -1,196 +1,249 @@
 import gymnasium as gym
-import numpy as np
 from gymnasium import spaces
-from numba import jit, int32, float32, boolean
-from typing import Tuple, Dict, Any, Optional
+import numpy as np
+from numba import jit
+from typing import Optional, Tuple, Dict, Any, List
 
 @jit(nopython=True)
-def toss_coins_numba(rng_state):
-    """Numba-optimized coin toss function"""
-    # Corrected random integer generation for Numba compatibility if needed,
-    # assuming np.random.RandomState object is passed if seeding is critical.
-    # For simplicity here, using the global np.random which might not be ideal for strict reproducibility in Numba.
-    # A better approach would be to pass a Numba-compatible random generator state.
-    coin1 = np.random.randint(0, 2) 
+def toss_coins_numba() -> Tuple[int, int, int]:
+    """Numba-optimized coin toss function.
+    Returns: (result, coin1, coin2)
+    result: 0 for Heads (HH), 1 for Tails (TT), 2 for Odds (HT/TH)
+    coin1, coin2: 0 for H, 1 for T
+    """
+    coin1 = np.random.randint(0, 2)
     coin2 = np.random.randint(0, 2)
-    
-    if coin1 == coin2:
-        return 0 if coin1 == 0 else 1, 0  # 0: heads, 1: tails, 0: no consecutive odds
+    if coin1 == 0 and coin2 == 0:
+        return 0, 0, 0  # Heads, Heads
+    elif coin1 == 1 and coin2 == 1:
+        return 1, 1, 1  # Tails, Tails
     else:
-        return 2, 1  # 2: odds, 1: consecutive odds
+        return 2, coin1, coin2  # Odds
 
-@jit(nopython=True)
-def get_observation_numba(current_streak, last_3_results_flat_0, last_3_results_flat_1, last_3_results_flat_2, current_bet, balance): # Modified for individual elements
-    return np.array([
-        current_streak,
-        last_3_results_flat_0, # Pass individual elements
-        last_3_results_flat_1,
-        last_3_results_flat_2,
-        current_bet,
-        balance
-    ], dtype=np.float32)
+def toss_coins_readable() -> Tuple[str, str, str]:
+    """Readable version of toss_coins_numba."""
+    numba_res, c1, c2 = toss_coins_numba()
+    res_map = {0: "Heads", 1: "Tails", 2: "Odds"}
+    coin_map = {0: "Heads", 1: "Tails"}
+    return res_map[numba_res], coin_map[c1], coin_map[c2]
 
 class TwoUpEnvNumba(gym.Env):
-    """Numba-optimized Two Up Environment"""
     metadata = {'render_modes': ['human', 'rgb_array'], 'render_fps': 4}
 
-    def __init__(self, render_mode: Optional[str] = None, gambler_personality: str = 'standard', initial_balance: float = 100.0, base_bet_amount: float = 5.0, max_episode_steps: int = 200):
+    def __init__(self, initial_balance:float=100.0, base_bet_amount:float=10.0,
+                 gambler_personality:str='standard', max_episode_steps:int=200,
+                 render_mode: Optional[str]=None):
         super().__init__()
         
-        self.fixed_bet_amount = np.float32(base_bet_amount) # Use passed base_bet_amount
-        self.initial_balance = np.float32(initial_balance) # Use passed initial_balance
+        self.base_bet_unit = float(base_bet_amount)
+        self.bet_multipliers = np.array([0.5, 1.0, 2.0], dtype=np.float32)
+        self.num_bet_levels = len(self.bet_multipliers)
+
+        self.initial_balance = np.float32(initial_balance)
+        if self.initial_balance <= 0:
+            raise ValueError("Initial balance must be positive.")
+            
         self.gambler_personality = gambler_personality
-        self.max_steps = max_episode_steps # Store max_episode_steps
-        self.current_step_in_episode = 0 # Initialize step counter for truncation
-        
-        # Action: 0: No Bet, 1: Bet Heads, 2: Bet Tails
-        self.action_space = spaces.Discrete(3) 
-        
-        self.observation_space = spaces.Box(
-            low=np.array([0, 0, 0, 0, 0, 0], dtype=np.float32), # Added dtype
-            high=np.array([10, 2, 2, 2, self.fixed_bet_amount, 1000], dtype=np.float32), # Corrected last_3_results and current_bet high
-            dtype=np.float32
-        )
-        
-        # Game state
-        self.current_streak = np.int32(0)
-        self.last_3_results = np.zeros(3, dtype=np.int32) # Ensure it's int32 for Numba
-        self.current_bet = np.float32(0.0)
-        self.balance = np.float32(100.0)
-        self.consecutive_odds = np.int32(0) # Still tracked for info, not agent observation
-        self.total_games = np.int32(0)
-        self.games_won = np.int32(0)
+        self.max_episode_steps = max_episode_steps
         self.render_mode = render_mode
-        # Initialize the random number generator state for Numba
-        # This is a simplified way; for true seeded Numba randomness, 
-        # you'd manage and pass the np.random.RandomState._bitgen explicitly if possible or use a Numba-specific PRNG.
-        # However, np.random.seed() in the main script often suffices for top-level seeding.
-    
-    def _get_observation(self):
-        """Get current observation using Numba-optimized function"""
-        return get_observation_numba(
-            np.float32(self.current_streak), # Ensure types match Numba function signature
-            np.int32(self.last_3_results[0]), # Pass individual elements and ensure type
-            np.int32(self.last_3_results[1]),
-            np.int32(self.last_3_results[2]),
-            np.float32(self.current_bet),
-            np.float32(self.balance)
-        )
-    
-    def reset(self, *, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None) -> Tuple[np.ndarray, Dict[str, Any]]:
-        """Reset the environment to initial state"""
-        super().reset(seed=seed)
-        if seed is not None:
-            # Numba uses its own PRNG state. Seeding numpy globally might not directly control
-            # the randomness inside JITted functions perfectly across all scenarios.
-            # For reproducible Numba randomness, more care is needed, possibly by passing
-            # a seeded generator or using a Numba-specific way to seed.
-            np.random.seed(seed)
-
-        self.current_streak = np.int32(0)
-        self.last_3_results = np.zeros(3, dtype=np.int32)
-        self.current_bet = np.float32(0.0)
-        self.balance = self.initial_balance # Reset to initial_balance
-        self.consecutive_odds = np.int32(0)
-        self.total_games = np.int32(0)
-        self.games_won = np.int32(0)
-        self.current_step_in_episode = 0 # Reset step counter
-        return self._get_observation(), {}
-    
-    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
-        """Execute one time step within the environment"""
-        terminated = False # Initialize terminated
-        truncated = False # Initialize truncated
-        self.current_step_in_episode += 1 # Increment step counter
         
-        # Toss coins first, as it happens regardless of bet (to update history)
-        # Pass the environment's random number generator state to the Numba function
-        # For Numba to use the gym's seeded RNG, direct passing of self.np_random might be complex.
-        # toss_coins_numba is currently using global np.random.
-        # If strict seeding for toss_coins_numba is required from gym's seed, 
-        # this part needs Numba-compatible RNG state management.
-        result, odds_increment = toss_coins_numba(self.np_random) # self.np_random is gym's seeded generator
+        self.action_space = spaces.Discrete(1 + (2 * self.num_bet_levels))
         
-        # Update history based on the toss
-        self.last_3_results = np.roll(self.last_3_results, -1)
-        self.last_3_results[-1] = result
-        if result == 2: # odds
-             self.consecutive_odds += 1
-        else:
-             self.consecutive_odds = 0 # reset if not odds
-
-        reward = np.float32(0.0) # Initialize reward as float
+        max_possible_bet_value = self.base_bet_unit * np.max(self.bet_multipliers)
         
-        # Personality-based initial reward adjustments
-        if self.gambler_personality == 'play_for_time':
-            reward += np.float32(0.05) # Survival bonus per step
-
-        if action == 0:  # No bet
-            self.current_bet = np.float32(0.0)
-            if self.gambler_personality == 'thrill_seeker':
-                reward -= np.float32(0.1) # Small penalty for inaction
-        else:  # Bet placed (action 1 for Heads, action 2 for Tails)
-            if self.gambler_personality == 'thrill_seeker':
-                reward += np.float32(0.2) # Small bonus for placing a bet
-
-            if self.fixed_bet_amount > self.balance:
-                reward += np.float32(-10.0) if self.gambler_personality != 'thrill_seeker' else np.float32(-5.0)
-                self.current_bet = np.float32(0.0)
-            else:
-                self.current_bet = self.fixed_bet_amount
-                if result != 2:  # Bet resolves only if not odds
-                    self.total_games += 1
-                    # Action 1 is Bet Heads (result 0 is Heads)
-                    # Action 2 is Bet Tails (result 1 is Tails)
-                    is_win = (action == 1 and result == 0) or \
-                             (action == 2 and result == 1)
-                    
-                    if is_win:
-                        win_amount = self.fixed_bet_amount
-                        reward += win_amount
-                        self.balance += win_amount
-                        self.current_streak += 1
-                        self.games_won += 1
-                    else:
-                        loss_amount = self.fixed_bet_amount
-                        if self.gambler_personality == 'loss_averse':
-                            loss_amount *= np.float32(1.5)
-                        reward -= loss_amount
-                        self.balance -= self.fixed_bet_amount
-                        self.current_streak = 0
-                # If it's odds (result == 2), the bet is a "push" or no action, reward is 0
-                # unless a specific house rule for odds bets is implemented. 
-                # Current logic: no win/loss on odds if a bet was placed.
+        obs_low = np.array([
+            0.0,  # rounds_played_ratio
+            -1.0, # toss result (None)
+            -1.0, 
+            -1.0, 
+            0.0,  # last_bet_amount / initial_balance (no bet)
+            0.0   # current_balance / initial_balance (bankrupt)
+        ], dtype=np.float32)
         
-        terminated = self.balance <= 0
-        if terminated:
-            if self.gambler_personality == 'standard': reward = np.float32(-100.0)
-            elif self.gambler_personality == 'thrill_seeker': reward = np.float32(-50.0)
-            elif self.gambler_personality == 'loss_averse': reward = np.float32(-150.0)
-            elif self.gambler_personality == 'play_for_time': reward = np.float32(-100.0) # Still penalize ruin
-            else: reward = np.float32(-100.0) # Default for unknown personality
+        obs_high = np.array([
+            1.0,  # rounds_played_ratio
+            2.0,  # toss result (Odds)
+            2.0,  
+            2.0,  
+            max_possible_bet_value / self.initial_balance if self.initial_balance > 0 else 1.0,
+            10.0  # current_balance can be 10x initial_balance
+        ], dtype=np.float32)
 
-        # Check for truncation due to max_episode_steps
-        if not terminated and self.current_step_in_episode >= self.max_steps:
-            truncated = True
-            # Optional: Add a specific reward adjustment for truncation if desired
-            # reward += np.float32(0.0) # Or some other value
+        self.observation_space = spaces.Box(obs_low, obs_high, dtype=np.float32)
+        
+        self.balance: float = 0.0
+        self.current_streak: int = 0
+        self.games_won: int = 0
+        self.total_games: int = 0
+        self.current_step_in_episode: int = 0
+        self.last_3_results_hr: List[str] = []
+        self.last_3_results_numba: np.ndarray = np.full(3, -1, dtype=np.int32)
+        self.last_bet_amount: float = 0.0
+        self.termination_reason: str = ""
 
-        info = {
-            'balance': np.float32(self.balance), # Ensure float
-            'result': np.int32(result) if result is not None else -1, # Ensure int, handle None
-            'consecutive_odds': np.int32(self.consecutive_odds), # Ensure int
-            'win_rate': np.float32(self.games_won / max(1, self.total_games)) if self.total_games > 0 else np.float32(0.0), # Ensure float
-            'reason': 'broke' if terminated else ('max_steps' if truncated else None),
-            'total_games': np.int32(self.total_games) # Added for consistency
+    def _get_numeric_toss_result(self, readable_result: str) -> int:
+        if readable_result == "Heads": return 0
+        if readable_result == "Tails": return 1
+        return 2 # Odds
+
+    def _convert_hr_results_to_numba_array(self, hr_results: List[str]) -> np.ndarray:
+        numba_arr = np.full(3, -1, dtype=np.int32)
+        for i, hr_res in enumerate(reversed(hr_results[-3:])):
+            if i < 3:
+                numba_arr[2 - i] = self._get_numeric_toss_result(hr_res)
+        return numba_arr
+
+    def _get_obs(self) -> np.ndarray:
+        obs = np.zeros(6, dtype=np.float32)
+        obs[0] = np.float32(self.current_step_in_episode / self.max_episode_steps if self.max_episode_steps > 0 else 0)
+        obs[1] = np.float32(self.last_3_results_numba[2])
+        obs[2] = np.float32(self.last_3_results_numba[1])
+        obs[3] = np.float32(self.last_3_results_numba[0])
+        obs[4] = np.float32(self.last_bet_amount / self.initial_balance if self.initial_balance > 0 else 0)
+        obs[5] = np.float32(self.balance / self.initial_balance if self.initial_balance > 0 else 0)
+        return obs
+
+    def _get_info(self) -> Dict[str, Any]:
+        return {
+            "balance": self.balance,
+            "current_streak": self.current_streak,
+            "games_won": self.games_won,
+            "total_games": self.total_games,
+            "current_step_in_episode": self.current_step_in_episode,
+            "last_3_results_hr": list(self.last_3_results_hr),
+            "last_3_results_numba": self.last_3_results_numba.tolist(),
+            "last_bet_amount": self.last_bet_amount,
+            "win_rate": self.games_won / max(1, self.total_games) if self.total_games > 0 else 0.0,
+            "termination_reason": self.termination_reason
         }
+
+    def _calculate_reward(self, bet_type: int, bet_amount_this_step: float, numeric_toss_result: int, won_bet: bool) -> float:
+        base_reward = 0.0
+        if bet_type == 0:
+            if self.gambler_personality == 'play_for_time': base_reward = 0.1
+        else:
+            if numeric_toss_result == 2:
+                if self.gambler_personality == 'loss_averse': base_reward = -0.05
+                elif self.gambler_personality == 'play_for_time': base_reward = 0.05
+            elif won_bet:
+                if self.gambler_personality == 'thrill_seeker': base_reward = bet_amount_this_step * 2.0
+                elif self.gambler_personality == 'loss_averse': base_reward = bet_amount_this_step * 0.5 
+                else: base_reward = bet_amount_this_step 
+            else:
+                if self.gambler_personality == 'thrill_seeker': base_reward = -bet_amount_this_step * 1.0
+                elif self.gambler_personality == 'loss_averse': base_reward = -bet_amount_this_step * 2.0
+                else: base_reward = -bet_amount_this_step
         
-        return self._get_observation(), reward, terminated, truncated, info # Return truncated
-    
-    def render(self) -> Optional[np.ndarray]:
-        """Render the current state"""
+        if self.balance <= 0 and bet_type > 0:
+            if self.gambler_personality == 'loss_averse': base_reward -= 50.0
+            elif self.gambler_personality == 'thrill_seeker': base_reward -= 5.0
+            else: base_reward -= 10.0
+        
+        return float(base_reward)
+
+    def reset(self, *, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None) -> Tuple[np.ndarray, Dict[str, Any]]:
+        super().reset(seed=seed)
+        self.balance = float(self.initial_balance)
+        self.current_streak = 0
+        self.games_won = 0
+        self.total_games = 0
+        self.current_step_in_episode = 0
+        self.last_3_results_hr = [] 
+        self.last_3_results_numba = np.full(3, -1, dtype=np.int32) 
+        self.last_bet_amount = 0.0
+        self.termination_reason = ""
+        return self._get_obs(), self._get_info()
+
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
+        self.current_step_in_episode += 1
+        terminated = False
+        truncated = False
+        
+        bet_type = 0
+        chosen_multiplier = 0.0
+        bet_amount_this_step = 0.0
+        won_bet_flag = False
+
+        if action == 0:
+            bet_type = 0
+        elif 1 <= action <= self.num_bet_levels:
+            bet_type = 1
+            multiplier_index = action - 1
+            chosen_multiplier = self.bet_multipliers[multiplier_index]
+        elif (self.num_bet_levels + 1) <= action <= (1 + 2 * self.num_bet_levels - 1):
+            bet_type = 2
+            multiplier_index = action - (self.num_bet_levels + 1)
+            chosen_multiplier = self.bet_multipliers[multiplier_index]
+
+        if bet_type > 0:
+            calculated_bet = self.base_bet_unit * chosen_multiplier
+            bet_amount_this_step = min(max(0.01, calculated_bet), self.balance)
+            if calculated_bet <=0:
+                 bet_amount_this_step = 0.0
+            if bet_amount_this_step <= 0:
+                bet_type = 0
+                bet_amount_this_step = 0.0
+        
+        self.last_bet_amount = bet_amount_this_step
+
+        readable_toss, _, _ = toss_coins_readable()
+        self.last_3_results_hr.append(readable_toss)
+        if len(self.last_3_results_hr) > 3: self.last_3_results_hr.pop(0)
+        self.last_3_results_numba = self._convert_hr_results_to_numba_array(self.last_3_results_hr)
+        numeric_toss_result = self._get_numeric_toss_result(readable_toss)
+
+        if bet_type > 0:
+            self.total_games += 1
+            if numeric_toss_result != 2:
+                is_win = (bet_type == 1 and numeric_toss_result == 0) or \
+                         (bet_type == 2 and numeric_toss_result == 1)
+                if is_win:
+                    self.balance += bet_amount_this_step
+                    self.games_won += 1
+                    self.current_streak += 1
+                    won_bet_flag = True
+                else:
+                    self.balance -= bet_amount_this_step
+                    self.current_streak = 0
+        
+        reward = self._calculate_reward(bet_type, bet_amount_this_step, numeric_toss_result, won_bet_flag)
+
+        if self.balance <= 0.001:
+            self.balance = 0.0
+            terminated = True
+            if not self.termination_reason: self.termination_reason = "bankrupt"
+        
+        if self.current_step_in_episode >= self.max_episode_steps:
+            truncated = True
+            if not terminated: self.termination_reason = "max_steps"
+
+        return self._get_obs(), reward, terminated, truncated, self._get_info()
+
+    def render(self):
         if self.render_mode == 'human':
-            print(f"Balance: ${self.balance:.2f}, Streak: {self.current_streak}, Last 3: {self.last_3_results}, Cons. Odds: {self.consecutive_odds}, WG: {self.games_won}/{self.total_games}")
+            print(f"Step: {self.current_step_in_episode}, Balance: {self.balance:.2f}, Last Bet: {self.last_bet_amount:.2f}, Streak: {self.current_streak}, Last 3: {self.last_3_results_hr}")
         elif self.render_mode == 'rgb_array':
-            # TODO: Implement RGB array rendering
-            return None 
+            return np.zeros((3, 100, 100), dtype=np.uint8)
+        return None
+
+    def close(self):
+        pass
+
+if __name__ == '__main__':
+    env = TwoUpEnvNumba(initial_balance=100, base_bet_amount=10, gambler_personality='standard', render_mode='human')
+    obs, info = env.reset()
+    print(f"Initial Obs: {obs}, Info: {info}")
+    print(f"Action Space: {env.action_space}, Sample: {env.action_space.sample()}")
+
+    for i in range(15):
+        action = env.action_space.sample()
+        print(f"\n--- Round {i+1} --- Action: {action} ---")
+        obs, reward, terminated, truncated, info = env.step(action)
+        env.render()
+        print(f"Obs: {obs}")
+        print(f"Reward: {reward:.2f}")
+        print(f"Info: {info}")
+        if terminated or truncated:
+            print(f"Episode finished after {i+1} steps. Reason: {info.get('termination_reason')}")
+            obs, info = env.reset()
+            print(f"Environment reset. New Obs: {obs}, Info: {info}") 

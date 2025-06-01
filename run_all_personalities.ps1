@@ -1,115 +1,107 @@
 # PowerShell script to run the full pipeline for all personalities
 
-[CmdletBinding()]
-Param(
-    [Switch]$ForceRetrain
-)
+param ( 
+    [Switch]$ForceRetrain 
+) 
 
-# Define the personalities
-$personalities = @("standard", "thrill_seeker", "loss_averse", "play_for_time")
+# Define global parameters for the runs
+$InitialBalance = 100.0
+$BaseBetUnit = 10.0      # This is the base_bet_unit for the env, used in betting calculations
+$MaxEpisodeSteps = 200
+$TotalTimestepsPPO = 100000 # Timesteps for PPO training
+$NumEpisodesEval = 1000    # Episodes for evaluations (rule-based, PPO vs baselines)
 
-# Define the number of episodes for evaluation scripts (applies to rule-based and PPO comparisons)
-$numEpisodes = 1000
+$Personalities = @("standard", "thrill_seeker", "loss_averse", "play_for_time")
 
-Write-Host "Starting full processing pipeline..."
+Write-Host "Starting the Two-Up RL Agent Pipeline..."
+Write-Host "Global Run Parameters:
+  Initial Balance: $InitialBalance
+  Base Bet Unit: $BaseBetUnit
+  Max Episode Steps: $MaxEpisodeSteps
+  PPO Training Timesteps: $TotalTimestepsPPO
+  Evaluation Episodes: $NumEpisodesEval"
 if ($ForceRetrain) {
-    Write-Host "ForceRetrain flag is set. All PPO models will be retrained even if they exist."
+    Write-Host "ForceRetrain flag is SET. PPO models will be retrained even if they exist."
 }
-Write-Host "Ensure Python environment is active and scripts are in the current path or specify full paths."
 Write-Host "=================================================================="
 
-# Step 0: Benchmark Rule-Based Strategies (Universal - Run Once)
-# This step is always run as it's relatively quick and its output might be updated.
-Write-Host ""
-Write-Host "------------------------------------------------------------------"
-Write-Host "[Step 0 - Universal] Benchmarking rule-based strategies (Episodes: $numEpisodes)..."
-Write-Host "------------------------------------------------------------------"
-python rule_based_strategies.py --episodes $numEpisodes # Personality argument no longer needed
+# --- 1. Run Universal Rule-Based Strategies (Once) ---
+Write-Host "`n--- [STEP 1/3] Running Universal Rule-Based Strategies ---"
+python rule_based_strategies.py --num-episodes $NumEpisodesEval --initial-balance $InitialBalance --base-bet $BaseBetUnit --max-episode-steps $MaxEpisodeSteps
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "Error during universal rule-based strategy benchmarking. Halting script."
-    exit $LASTEXITCODE
+    Write-Error "Rule-based strategies script failed. Halting."
+    exit 1
 }
-Write-Host "[Step 0 - Universal] Finished benchmarking rule-based strategies."
-Write-Host "Results saved to reports/rule_based_strategies_summary_universal_<timestamp>.json"
-Write-Host "=================================================================="
+Write-Host "Universal Rule-Based Strategies evaluation complete."
 
+# --- 2. Process Each PPO Personality ---
+Write-Host "`n--- [STEP 2/3] Processing PPO Agent Personalities ---"
+foreach ($personality in $Personalities) {
+    Write-Host "`n  --- Processing Personality: $personality ---"
+    $ErrorActionPreference = "Stop" # Stop script if a command fails within this personality block
 
-foreach ($personality in $personalities) {
-    Write-Host ""
-    Write-Host "------------------------------------------------------------------"
-    Write-Host "Processing PPO agent for personality: $personality"
-    Write-Host "------------------------------------------------------------------"
-
-    # Define model path
     $modelFile = "personality_agents/$personality/models/ppo_two_up_$personality.zip"
+    $ppoReportFileDir = "personality_agents/$personality/reports"
+    
+    # Check for existing PPO vs Baselines report *before* training/comparison attempts
+    $existingPpoVsBaselinesReportPath = Get-ChildItem -Path $ppoReportFileDir -Filter "ppo_vs_baselines_${personality}_*.json" | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object { $_.FullName }
 
-    # Step 1: Train PPO Agent for current personality (Conditional)
-    if ($ForceRetrain -Or !(Test-Path $modelFile)) {
-        Write-Host "[Step 1/3 for $personality] Training PPO agent..."
-        # Ensure model directory exists before training
-        $modelDir = "personality_agents/$personality/models"
-        if (!(Test-Path $modelDir)) {
-            New-Item -ItemType Directory -Force -Path $modelDir | Out-Null
-        }
-        python train_personality_agent.py --personality $personality
+    # a. Train PPO Agent
+    if ($ForceRetrain -or !(Test-Path $modelFile)) {
+        Write-Host "    [2a] Training PPO agent for $personality..."
+        python train_personality_agent.py --personality $personality --timesteps $TotalTimestepsPPO --initial-balance $InitialBalance --base-bet $BaseBetUnit --max-episode-steps $MaxEpisodeSteps
         if ($LASTEXITCODE -ne 0) {
-            Write-Error "Error during training for $personality. Halting script."
-            exit $LASTEXITCODE
+            Write-Error "    PPO training for $personality failed. Skipping subsequent steps for this personality."
+            continue # Skip to next personality
         }
-        Write-Host "[Step 1/3 for $personality] Finished training PPO agent."
+        Write-Host "    PPO training for $personality completed."
     } else {
-        Write-Host "[Step 1/3 for $personality] Skipping training. Model file already exists at '$modelFile'. Use -ForceRetrain to retrain."
+        Write-Host "    [2a] Skipping PPO training for $personality (model exists: $modelFile and -ForceRetrain not used)."
     }
-    Write-Host ""
 
-    # Step 2: Evaluate PPO vs. Baselines for current personality
-    # This step should run if the model exists (either newly trained or pre-existing)
+    # b. Compare PPO Agent vs. Baselines (only if model exists)
     if (Test-Path $modelFile) {
-        Write-Host "[Step 2/3 for $personality] Evaluating PPO vs. baselines (Episodes: $numEpisodes)..."
-        python compare_personalities.py --personality $personality --episodes $numEpisodes
+        Write-Host "    [2b] Comparing PPO agent vs. baselines for $personality..."
+        python compare_personalities.py --personality $personality --num-episodes $NumEpisodesEval --initial-balance $InitialBalance --base-bet $BaseBetUnit --max-episode-steps $MaxEpisodeSteps
         if ($LASTEXITCODE -ne 0) {
-            Write-Error "Error during PPO vs. baselines evaluation for $personality. Halting script."
-            exit $LASTEXITCODE
+            Write-Error "    PPO comparison for $personality failed. Skipping master report for this personality."
+            # Update path to nullify, so master report doesn't try to use potentially partial/old data
+            $existingPpoVsBaselinesReportPath = $null 
+            continue # Skip to next personality if comparison fails critically
         }
-        Write-Host "[Step 2/3 for $personality] Finished evaluating PPO vs. baselines."
+        Write-Host "    PPO comparison for $personality completed."
+        # Refresh the path to ensure we get the newly created one
+        $existingPpoVsBaselinesReportPath = Get-ChildItem -Path $ppoReportFileDir -Filter "ppo_vs_baselines_${personality}_*.json" | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object { $_.FullName }
     } else {
-        Write-Warning "[Step 2/3 for $personality] Skipping PPO evaluation. Model file '$modelFile' not found and was not trained in this run."
+        Write-Host "    [2b] Skipping PPO comparison for $personality (model file not found: $modelFile)."
+        $existingPpoVsBaselinesReportPath = $null # Ensure no master report if PPO model is missing
     }
-    Write-Host ""
 
-    # Step 3: Generate Master Report for current personality (compares PPO to universal rule-based)
-    # This step should also ideally only run if PPO data is available to compare.
-    $ppoReportFilePattern = "personality_agents/$personality/reports/ppo_vs_baselines_*.json"
-    if (Test-Path $modelFile -And (Get-ChildItem $ppoReportFilePattern -ErrorAction SilentlyContinue)) { # Check if model exists and PPO report was likely generated
-        Write-Host "[Step 3/3 for $personality] Generating master report..."
-        python generate_master_report.py --personality $personality
+    # c. Generate Master Report (only if PPO vs Baselines report exists for this personality)
+    if ($existingPpoVsBaselinesReportPath -and (Test-Path $existingPpoVsBaselinesReportPath)) {
+        Write-Host "    [2c] Generating master summary report for $personality..."
+        python generate_master_report.py --personality $personality --initial-balance $InitialBalance --base-bet $BaseBetUnit --max-episode-steps $MaxEpisodeSteps --num-episodes-context $NumEpisodesEval
         if ($LASTEXITCODE -ne 0) {
-            Write-Error "Error during master report generation for $personality. Halting script."
-            exit $LASTEXITCODE
+            Write-Warning "    Master report generation for $personality encountered an issue (non-critical)."
+            # Continue, as this is a reporting step
+        } else {
+            Write-Host "    Master report for $personality generated."
         }
-        Write-Host "[Step 3/3 for $personality] Finished generating master report."
     } else {
-        Write-Warning "[Step 3/3 for $personality] Skipping master report generation. PPO model or its evaluation report not found for '$personality'."
+        Write-Host "    [2c] Skipping master report generation for $personality (PPO vs Baselines report not found or comparison failed: $existingPpoVsBaselinesReportPath)."
     }
-    Write-Host "------------------------------------------------------------------"
-    Write-Host "Completed PPO agent processing for personality: $personality"
-    Write-Host "=================================================================="
+    $ErrorActionPreference = "Continue" # Reset to default error action preference
 }
+Write-Host "`nAll PPO agent personalities processed."
 
-# Final Step: Run Break-Even Analysis (if reports exist)
-Write-Host ""
-Write-Host "------------------------------------------------------------------"
-Write-Host "[Final Step] Running Break-Even Chance Analysis..."
-Write-Host "------------------------------------------------------------------"
-python analyze_breakeven_chances.py --plot
+# --- 3. Final Analysis (Break-Even Chances) ---
+Write-Host "`n--- [STEP 3/3] Analyzing Break-Even Chances Across All Strategies ---"
+python analyze_breakeven_chances.py --plot --initial-balance $InitialBalance
 if ($LASTEXITCODE -ne 0) {
-    Write-Warning "Warning during break-even chance analysis (script might have handled missing files gracefully)."
-    # Not exiting with error as analyze_breakeven_chances.py is designed to handle missing files.
+    Write-Warning "Break-even analysis script encountered an issue."
 }
-Write-Host "[Final Step] Finished Break-Even Chance Analysis."
-Write-Host "Plot saved to reports/analysis_results/breakeven_chance_comparison.png (if data was available)"
-Write-Host "=================================================================="
+Write-Host "Break-even analysis complete."
 
-Write-Host ""
-Write-Host "All PPO personalities processed and compared against universal rule-based benchmarks."
-Write-Host "Pipeline finished." 
+Write-Host "`n=================================================================="
+Write-Host "Two-Up RL Agent Variable Bet Size Pipeline finished."
+Write-Host "Check the 'personality_agents/<personality>/reports' and 'reports/analysis_results' directories for outputs." 
