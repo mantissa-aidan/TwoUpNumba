@@ -1,21 +1,21 @@
 # Two Up Environment Improvements
 
-## 1. Migrate to Gymnasium
-- [ ] Update imports from `gym` to `gymnasium`
-- [ ] Update environment class to inherit from `gymnasium.Env`
-- [ ] Update action and observation spaces to use Gymnasium's space classes
-- [ ] Update metadata and render modes to match Gymnasium standards
-- [ ] Add proper type hints and docstrings following Gymnasium conventions
+## 1. Migrate to Gymnasium ✅
+- [x] Update imports from `gym` to `gymnasium`
+- [x] Update environment class to inherit from `gymnasium.Env`
+- [x] Update action and observation spaces to use Gymnasium's space classes
+- [x] Update metadata and render modes to match Gymnasium standards
+- [x] Add proper type hints and docstrings following Gymnasium conventions
 
-## 2. GPU Support
-- [ ] Add PyTorch as a dependency
-- [ ] Update requirements.txt with GPU-compatible versions
-- [ ] Modify PPO implementation to use GPU when available
-- [ ] Add device detection and automatic GPU usage
-- [ ] Add memory management for GPU operations
+## 2. GPU Support ✅
+- [x] Add PyTorch as a dependency
+- [x] Update requirements.txt with GPU-compatible versions
+- [x] Modify PPO implementation to use GPU when available
+- [x] Add device detection and automatic GPU usage
+- [x] Add memory management for GPU operations
 
 ## 3. Training Visualization
-- [ ] Add TensorBoard integration
+- [x] Add TensorBoard integration
 - [ ] Create custom logging for:
   - [ ] Training rewards
   - [ ] Win rates
@@ -79,8 +79,8 @@
 - [ ] Add system monitoring
 
 ## Priority Order
-1. Migrate to Gymnasium (Critical)
-2. Add GPU Support (High)
+1. ~~Migrate to Gymnasium (Critical)~~ ✅
+2. ~~Add GPU Support (High)~~ ✅
 3. Training Visualization (High)
 4. Code Structure Improvements (Medium)
 5. Simulation Visualization (Medium)
